@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CRIMEFILE // Timeline Reconstruction</title>
+
+<style>
+:root{--bg:#101214;--panel:#1a1e21;--ink:#e9e7df;--muted:#aab0b3;--red:#d94b4b;--line:#3a4248;--gold:#d8b46a}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,Arial,sans-serif}
+main{max-width:850px;margin:auto;padding:28px 18px 60px}
+.tag{color:var(--red);letter-spacing:.16em;font-size:.75rem;font-weight:800}
+h1{font-size:clamp(1.8rem,5vw,2.6rem);margin:.35rem 0}
+p{color:#c6c9c7}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px;margin-top:18px}
+.cards{display:grid;gap:10px}
+.card{display:grid;grid-template-columns:1fr 100px;gap:12px;align-items:center;background:#111416;border:1px solid var(--line);border-radius:8px;padding:12px}
+select{width:100%;background:#0b0d0e;color:var(--ink);border:1px solid #596168;border-radius:6px;padding:10px;font-size:1rem}
+button{background:var(--red);border:0;color:#fff;font-weight:750;border-radius:7px;padding:12px 16px;cursor:pointer;margin-top:14px}
+.result{margin-top:16px;padding:15px;border-left:4px solid var(--gold);background:#111416}
+.small{color:var(--muted);font-size:.9rem}
+.next-link{display:inline-block;margin-top:10px;padding:10px 14px;border-radius:7px;background:var(--gold);color:#101214;font-weight:800;text-decoration:none}
+.next-link:hover{filter:brightness(1.08)}
+@media(max-width:520px){.card{grid-template-columns:1fr 84px}}
+</style>
+</head>
+
+<body>
+<main>
+
+<div class="tag">CRIMEFILE / CASE 002 / DIGITAL EXHIBIT 02</div>
+
+<h1>Timeline Reconstruction</h1>
+
+<p>
+These records were recovered from different systems. Arrange them
+in the order in which the recorded events occurred. A timestamp
+proves when a system recorded an event—not necessarily what a
+person was doing.
+</p>
+
+<div class="panel">
+  <div class="cards" id="cards"></div>
+  <button id="check">Submit timeline</button>
+  <div id="feedback" aria-live="polite"></div>
+</div>
+
+<p class="small">
+Tip: distinguish the creation of a scheduled task from the later
+time when the message was sent.
+</p>
+
+</main>
+
+<script>
+const events = [
+  {
+    id: "A",
+    time: "21:12",
+    text: "Dr Mercer records a medication-entry discrepancy and opens a correction note.",
+    order: 1
+  },
+  {
+    id: "B",
+    time: "21:26",
+    text: "Naomi Reed’s work account receives the discrepancy alert.",
+    order: 2
+  },
+  {
+    id: "C",
+    time: "21:54",
+    text: "A message task is saved locally on Adrian’s phone for later delivery.",
+    order: 3
+  },
+  {
+    id: "D",
+    time: "22:11",
+    text: "Naomi is recorded entering the parking area.",
+    order: 4
+  },
+  {
+    id: "E",
+    time: "23:39",
+    text: "The previously scheduled message is accepted by the messaging service.",
+    order: 5
+  }
+];
+
+// Proposed additions A/B must be made consistent
+// with the case's final timeline.
+
+const cards = document.querySelector("#cards");
+
+function render() {
+  cards.innerHTML = "";
+
+  const shuffled = [...events].sort(() => Math.random() - 0.5);
+
+  shuffled.forEach(ev => {
+    const div = document.createElement("div");
+    div.className = "card";
+
+    div.innerHTML = `
+      <div>
+        <b>Record ${ev.id}</b><br>
+        ${ev.text}
+      </div>
+
+      <label class="small">
+        Position
+        <select data-id="${ev.id}">
+          <option value="">Choose…</option>
+          ${events.map((_, i) =>
+            `<option value="${i + 1}">${i + 1}</option>`
+          ).join("")}
+        </select>
+      </label>
+    `;
+
+    cards.appendChild(div);
+  });
+}
+
+render();
+
+document.querySelector("#check").addEventListener("click", () => {
+  const sels = [...document.querySelectorAll("select")];
+  const vals = sels.map(s => s.value);
+  const feedback = document.querySelector("#feedback");
+
+  if (vals.some(v => !v) || new Set(vals).size !== vals.length) {
+    feedback.innerHTML = `
+      <div class="result">
+        Assign a unique position to every record before submitting.
+      </div>
+    `;
+    return;
+  }
+
+  const byId = Object.fromEntries(
+    sels.map(s => [s.dataset.id, Number(s.value)])
+  );
+
+  const correct = events.every(e => byId[e.id] === e.order);
+
+  if (correct) {
+    feedback.innerHTML = `
+      <div class="result">
+
+        <b>Timeline verified.</b>
+
+        <p>
+          The discrepancy alert reached Naomi before the
+          scheduled-message task was created. The 23:39 delivery
+          does not prove Adrian was actively using his phone
+          at that time.
+        </p>
+
+        <p>
+          <b>New lead:</b> Investigators must now establish whether
+          Naomi understood the alert and what she did after receiving it.
+        </p>
+
+        <p class="small">
+          These entries are proposed digital evidence. Keep their
+          times consistent with the final master timeline before publishing.
+        </p>
+
+        <p>
+          <a class="next-link" href="03_knowledge_action_intent.html">
+            Proceed to Digital Exhibit 03: Knowledge, Action, Intent →
+          </a>
+        </p>
+
+      </div>
+    `;
+  } else {
+    feedback.innerHTML = `
+      <div class="result">
+        Not quite. Re-check the timestamps and remember:
+        task creation and message delivery are separate events.
+      </div>
+    `;
+  }
+});
+</script>
+
+</body>
+</html>
