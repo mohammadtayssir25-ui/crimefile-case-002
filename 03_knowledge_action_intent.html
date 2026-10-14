@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CRIMEFILE // Knowledge and Intent</title>
+
+<style>
+:root{--bg:#101214;--panel:#1a1e21;--ink:#e9e7df;--muted:#aab0b3;--red:#d94b4b;--line:#3a4248;--gold:#d8b46a}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,Arial,sans-serif}
+main{max-width:850px;margin:auto;padding:28px 18px 60px}
+.tag{color:var(--red);letter-spacing:.16em;font-size:.75rem;font-weight:800}
+h1{font-size:clamp(1.8rem,5vw,2.6rem);margin:.35rem 0}
+p{color:#c6c9c7}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px;margin-top:18px}
+.record{padding:14px;background:#111416;border:1px solid var(--line);border-radius:8px;margin:10px 0}
+label{display:block;padding:10px 0;border-bottom:1px solid var(--line);cursor:pointer}
+input{accent-color:var(--red);margin-right:8px}
+button{background:var(--red);border:0;color:#fff;font-weight:750;border-radius:7px;padding:12px 16px;cursor:pointer;margin-top:14px}
+.result{margin-top:16px;padding:15px;border-left:4px solid var(--gold);background:#111416}
+.small{color:var(--muted);font-size:.9rem}
+</style>
+</head>
+
+<body>
+<main>
+
+<div class="tag">CRIMEFILE / CASE 002 / DIGITAL EXHIBIT 03</div>
+
+<h1>Knowledge, Action, Intent</h1>
+
+<p>
+The evidence now suggests that Naomi received information about
+a serious medication discrepancy. But investigators must
+distinguish three different questions: what she knew, what she
+did, and what she intended.
+</p>
+
+<div class="panel">
+
+  <div class="record">
+    <b>Record 1 — Delivery receipt</b><br>
+    Naomi’s work account received the medication discrepancy alert
+    at 21:26. The receipt proves delivery to the account, not that
+    she read or understood it.
+  </div>
+
+  <div class="record">
+    <b>Record 2 — Calendar audit</b><br>
+    The audit shows Naomi moved Adrian’s 08:30 call to a later date
+    after the alert was delivered. The audit does not, by itself,
+    establish why she changed it.
+  </div>
+
+  <div class="record">
+    <b>Record 3 — Recovered draft</b><br>
+    A draft in Naomi’s work account reads: “I saw the discrepancy.
+    Do not wake him or call the clinic tonight. If this is raised
+    tomorrow, I can say I never saw the alert.” The draft is
+    timestamped after the alert. Investigators have not yet
+    authenticated its author.
+  </div>
+
+  <p>
+    <b>Question:</b> Which conclusions are supported by the combined
+    records? Select every defensible answer.
+  </p>
+
+  <form id="quiz">
+
+    <label>
+      <input type="checkbox" name="a" value="1">
+      Naomi’s account received the alert before the calendar change.
+    </label>
+
+    <label>
+      <input type="checkbox" name="a" value="2">
+      The delivery receipt alone proves Naomi read and understood the alert.
+    </label>
+
+    <label>
+      <input type="checkbox" name="a" value="3">
+      If authenticated as Naomi’s, the draft would support that she
+      knew about the discrepancy and considered withholding action.
+    </label>
+
+    <label>
+      <input type="checkbox" name="a" value="4">
+      The calendar change alone proves Naomi intended Adrian to die.
+    </label>
+
+    <label>
+      <input type="checkbox" name="a" value="5">
+      The records create a strong lead, but investigators still need
+      to authenticate the draft and connect it to the death.
+    </label>
+
+    <button type="submit">Evaluate evidence</button>
+
+  </form>
+
+  <div id="result" aria-live="polite"></div>
+
+</div>
+
+<p class="small">
+Design note: the recovered draft is a proposed clue. Use it only
+if you want the digital game to provide direct evidence of knowing
+inaction; otherwise replace it with a less conclusive record.
+</p>
+
+</main>
+
+<script>
+document.querySelector("#quiz").addEventListener("submit", e => {
+  e.preventDefault();
+
+  const selected = [
+    ...document.querySelectorAll('input[name="a"]:checked')
+  ].map(x => x.value).sort();
+
+  const correct = ["1", "3", "5"];
+  const result = document.querySelector("#result");
+
+  if (JSON.stringify(selected) === JSON.stringify(correct)) {
+    result.innerHTML = `
+      <div class="result">
+
+        <b>Evidence assessment accepted.</b>
+
+        <p>
+          The alert establishes delivery, the calendar audit
+          establishes a later action, and the draft—if authenticated—
+          could connect knowledge to a deliberate decision not to act.
+          None should be treated as conclusive in isolation.
+        </p>
+
+        <p>
+          <b>Final investigative question:</b>
+          Does the physical and medical evidence independently
+          support the conclusion that the failure to act was
+          connected to Adrian’s death?
+        </p>
+
+        <p class="small">
+          This puzzle raises suspicion of Naomi while preserving
+          the need to corroborate the theory.
+        </p>
+
+      </div>
+    `;
+  } else {
+    result.innerHTML = `
+      <div class="result">
+        Review the distinction between a system receipt,
+        a recorded action, and proof of intent. Select only
+        conclusions the records can support.
+      </div>
+    `;
+  }
+});
+</script>
+
+</body>
+</html>
