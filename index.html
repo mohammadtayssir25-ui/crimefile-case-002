@@ -1,0 +1,595 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CRIMEFILE // Archive Lock</title>
+
+<style>
+:root{
+  --bg:#101214;
+  --panel:#1a1e21;
+  --ink:#e9e7df;
+  --muted:#9ba3a8;
+  --red:#d94b4b;
+  --line:#3a4248;
+  --gold:#d8b46a
+}
+
+*{box-sizing:border-box}
+
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--ink);
+  font:16px/1.5 system-ui,Arial,sans-serif
+}
+
+main{
+  max-width:760px;
+  margin:0 auto;
+  padding:28px 18px 60px
+}
+
+.tag{
+  color:var(--red);
+  letter-spacing:.18em;
+  font-size:.75rem;
+  font-weight:800
+}
+
+h1{
+  font-size:clamp(1.8rem,5vw,2.7rem);
+  margin:.35rem 0
+}
+
+p{color:#c6c9c7}
+
+.panel{
+  background:var(--panel);
+  border:1px solid var(--line);
+  padding:22px;
+  border-radius:12px;
+  margin-top:18px
+}
+
+.code{
+  display:flex;
+  gap:8px;
+  max-width:330px
+}
+
+.code input{
+  width:25%;
+  min-width:0;
+  background:#0b0d0e;
+  color:var(--ink);
+  border:1px solid #596168;
+  border-radius:8px;
+  text-align:center;
+  font-size:1.7rem;
+  padding:12px
+}
+
+button{
+  background:var(--red);
+  border:0;
+  color:white;
+  font-weight:750;
+  border-radius:7px;
+  padding:11px 16px;
+  cursor:pointer;
+  margin-top:12px
+}
+
+button:focus,input:focus{
+  outline:2px solid var(--gold);
+  outline-offset:2px
+}
+
+button:disabled{
+  opacity:.45;
+  cursor:not-allowed
+}
+
+.legend{
+  display:flex;
+  gap:15px;
+  flex-wrap:wrap;
+  font-size:.9rem;
+  color:var(--muted);
+  margin:12px 0
+}
+
+.mark{
+  font-weight:900;
+  color:var(--gold)
+}
+
+#history{
+  display:grid;
+  gap:8px;
+  margin-top:15px
+}
+
+.row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:14px;
+  background:#111416;
+  border:1px solid var(--line);
+  border-radius:7px;
+  padding:9px 12px
+}
+
+.guess{
+  font-family:ui-monospace,monospace;
+  letter-spacing:.3em;
+  font-size:1.1rem
+}
+
+.feedback{
+  font-family:ui-monospace,monospace;
+  letter-spacing:.18em;
+  color:var(--gold)
+}
+
+#result{margin-top:18px}
+
+.evidence{
+  border-left:4px solid var(--gold);
+  padding:14px 16px;
+  background:#111416
+}
+
+.evidence h2{
+  margin:.1rem 0 .6rem;
+  font-size:1.2rem
+}
+
+.small{
+  font-size:.88rem;
+  color:var(--muted)
+}
+
+#status{
+  margin-top:12px
+}
+
+#cooldown{
+  color:var(--gold);
+  font-weight:800;
+  font-size:1.05rem
+}
+
+.next-link{
+  display:inline-block;
+  margin-top:10px;
+  padding:10px 14px;
+  border-radius:7px;
+  background:var(--gold);
+  color:#101214;
+  font-weight:800;
+  text-decoration:none
+}
+
+.next-link:hover{filter:brightness(1.08)}
+</style>
+</head>
+
+<body>
+<main>
+
+<div class="tag">CRIMEFILE / CASE 002 / DIGITAL EXHIBIT 01</div>
+
+<h1>Restricted Archive Lock</h1>
+
+<p>
+Four digits protect the first technical exhibit.
+Enter a four-digit attempt and use the feedback to crack the lock.
+You have eight attempts per round.
+</p>
+
+<div class="panel">
+
+<div class="legend">
+  <span><b class="mark">X</b> = correct digit, correct position</span>
+  <span><b class="mark">O</b> = correct digit, wrong position</span>
+  <span><b>—</b> = digit not in code</span>
+</div>
+
+<label for="guess">Attempt</label>
+
+<div class="code">
+  <input
+    id="guess"
+    inputmode="numeric"
+    maxlength="4"
+    autocomplete="off"
+    aria-label="Four digit code"
+  >
+</div>
+
+<button id="submit">Test code</button>
+
+<div id="status" aria-live="polite" class="small"></div>
+
+<div id="cooldown" aria-live="polite"></div>
+
+<div id="history"></div>
+
+<div id="result"></div>
+
+</div>
+
+<p class="small">
+Case note: feedback counts duplicate digits correctly.
+The order of the feedback marks does not correspond to the order
+of your guessed digits.
+</p>
+
+</main>
+
+<script>
+// =============================================
+// CONFIGURATION
+// =============================================
+
+const SECRET = "8064";
+const MAX_ATTEMPTS = 8;
+const COOLDOWN_SECONDS = 45;
+
+const STORAGE_KEY = "crimefile_archive_lock_v2";
+
+// =============================================
+// ELEMENTS
+// =============================================
+
+const input = document.querySelector("#guess");
+const submit = document.querySelector("#submit");
+const status = document.querySelector("#status");
+const cooldownDisplay = document.querySelector("#cooldown");
+const history = document.querySelector("#history");
+const result = document.querySelector("#result");
+
+// =============================================
+// GAME STATE
+// =============================================
+
+let attempts = 0;
+let solved = false;
+let lockedUntil = 0;
+let timer = null;
+
+// =============================================
+// SAVE AND RESTORE GAME STATE
+// =============================================
+
+function saveState() {
+  const state = {
+    attempts,
+    solved,
+    lockedUntil,
+    history: [...history.children].map(row => ({
+      guess: row.querySelector(".guess").textContent,
+      feedback: row.querySelector(".feedback").textContent
+    }))
+  };
+
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function restoreState() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+
+    if (!saved) return;
+
+    const state = JSON.parse(saved);
+
+    attempts = Number(state.attempts) || 0;
+    solved = state.solved === true;
+    lockedUntil = Number(state.lockedUntil) || 0;
+
+    if (Array.isArray(state.history)) {
+      state.history.forEach(item => {
+        const row = document.createElement("div");
+        row.className = "row";
+
+        const guessSpan = document.createElement("span");
+        guessSpan.className = "guess";
+        guessSpan.textContent = item.guess;
+
+        const feedbackSpan = document.createElement("span");
+        feedbackSpan.className = "feedback";
+        feedbackSpan.textContent = item.feedback;
+
+        row.append(guessSpan, feedbackSpan);
+        history.appendChild(row);
+      });
+    }
+
+    if (solved) {
+      showUnlocked();
+    }
+
+  } catch (error) {
+    console.error("Could not restore game state:", error);
+  }
+}
+
+// =============================================
+// SCORE A GUESS
+// =============================================
+
+function scoreGuess(guess, secret) {
+  const marks = Array(4).fill("—");
+  const remaining = {};
+
+  // First pass: find exact matches.
+  for (let i = 0; i < 4; i++) {
+    if (guess[i] === secret[i]) {
+      marks[i] = "X";
+    } else {
+      remaining[secret[i]] =
+        (remaining[secret[i]] || 0) + 1;
+    }
+  }
+
+  // Second pass: find correct digits in wrong positions.
+  for (let i = 0; i < 4; i++) {
+    if (marks[i] === "X") continue;
+
+    if (remaining[guess[i]] > 0) {
+      marks[i] = "O";
+      remaining[guess[i]]--;
+    }
+  }
+
+  return marks;
+}
+
+// =============================================
+// SHUFFLE FEEDBACK SYMBOLS
+// =============================================
+
+function shuffleMarks(marks) {
+  for (let i = marks.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+
+    [marks[i], marks[j]] = [marks[j], marks[i]];
+  }
+
+  return marks;
+}
+
+// =============================================
+// DISPLAY UNLOCKED EVIDENCE
+// =============================================
+
+function showUnlocked() {
+  solved = true;
+
+  input.disabled = true;
+  submit.disabled = true;
+
+  status.textContent = "Archive unlocked.";
+  cooldownDisplay.textContent = "";
+
+  result.innerHTML = `
+    <div class="evidence">
+
+      <div class="tag">
+        EXHIBIT MED-01 / PROPOSED DIGITAL ADDITION
+      </div>
+
+      <h2>Medication Audit — Restricted Extract</h2>
+
+      <p>
+        <b>Prescription entry:</b> 1.0 unit.
+      </p>
+
+      <p>
+        <b>Administration record:</b> 10.0 units entered.
+      </p>
+
+      <p>
+        <b>Dr Julian Mercer’s note:</b>
+        “Decimal placement error. I entered the administration
+        figure incorrectly. I need to correct the record and notify
+        the relevant parties.”
+      </p>
+
+      <p>
+        <b>System receipt:</b>
+        Naomi Reed’s work account received a copy of the medication
+        discrepancy alert before the end of the evening.
+      </p>
+
+      <p>
+        <b>Investigator’s caution:</b>
+        The discrepancy is evidence of a serious error. By itself,
+        it does not prove that Dr Mercer intended harm, nor does
+        receipt prove what Naomi understood.
+      </p>
+
+      <p>
+        <a class="next-link" href="02_timeline_reconstruction.html">
+          Proceed to Digital Exhibit 02: Timeline Reconstruction →
+        </a>
+      </p>
+
+    </div>
+  `;
+
+  saveState();
+}
+
+// =============================================
+// COOLDOWN SYSTEM
+// =============================================
+
+function startCooldown() {
+  lockedUntil = Date.now() + COOLDOWN_SECONDS * 1000;
+
+  input.disabled = true;
+  submit.disabled = true;
+
+  saveState();
+  updateCooldown();
+}
+
+function updateCooldown() {
+  if (solved) return;
+
+  const remainingMs = lockedUntil - Date.now();
+
+  if (remainingMs <= 0) {
+    clearInterval(timer);
+    timer = null;
+
+    // A new round begins.
+    attempts = 0;
+    lockedUntil = 0;
+
+    input.disabled = false;
+    submit.disabled = false;
+
+    cooldownDisplay.textContent = "";
+    status.textContent = "New round started. Attempts remaining: 8";
+
+    saveState();
+    input.focus();
+
+    return;
+  }
+
+  const seconds = Math.ceil(remainingMs / 1000);
+
+  status.textContent = "Lockout: all eight attempts have been used.";
+
+  cooldownDisplay.textContent =
+    `You can try again in ${seconds} second${seconds === 1 ? "" : "s"}.`;
+
+  input.disabled = true;
+  submit.disabled = true;
+}
+
+function checkCooldown() {
+  if (solved) return;
+
+  if (lockedUntil > Date.now()) {
+    input.disabled = true;
+    submit.disabled = true;
+
+    updateCooldown();
+
+    if (!timer) {
+      timer = setInterval(updateCooldown, 250);
+    }
+  } else if (lockedUntil > 0) {
+    // The cooldown expired while the page was closed.
+    lockedUntil = 0;
+    attempts = 0;
+
+    input.disabled = false;
+    submit.disabled = false;
+
+    cooldownDisplay.textContent = "";
+    status.textContent = "New round started. Attempts remaining: 8";
+
+    saveState();
+  } else {
+    input.disabled = false;
+    submit.disabled = false;
+
+    status.textContent =
+      `Attempts remaining: ${MAX_ATTEMPTS - attempts}`;
+  }
+}
+
+// =============================================
+// TEST CODE
+// =============================================
+
+function test() {
+  if (solved) return;
+
+  if (lockedUntil > Date.now()) {
+    updateCooldown();
+    return;
+  }
+
+  const guess = input.value.trim();
+
+  if (!/^\d{4}$/.test(guess)) {
+    status.textContent = "Enter exactly four digits.";
+    return;
+  }
+
+  attempts++;
+
+  const marks = shuffleMarks(scoreGuess(guess, SECRET));
+
+  const row = document.createElement("div");
+  row.className = "row";
+
+  const guessSpan = document.createElement("span");
+  guessSpan.className = "guess";
+  guessSpan.textContent = guess;
+
+  const feedbackSpan = document.createElement("span");
+  feedbackSpan.className = "feedback";
+  feedbackSpan.textContent = marks.join(" ");
+
+  row.append(guessSpan, feedbackSpan);
+
+  history.prepend(row);
+
+  input.value = "";
+
+  // Correct password.
+  if (guess === SECRET) {
+    showUnlocked();
+    return;
+  }
+
+  // All attempts used.
+  if (attempts >= MAX_ATTEMPTS) {
+    status.textContent =
+      "Lockout: eight attempts used.";
+
+    cooldownDisplay.textContent =
+      "Your next round will be available shortly.";
+
+    saveState();
+    startCooldown();
+
+    return;
+  }
+  status.textContent =
+    `Incorrect code. Attempts remaining: ${MAX_ATTEMPTS - attempts}`;
+
+  saveState();
+
+  input.focus();
+}
+submit.addEventListener("click", test);
+
+input.addEventListener("keydown", event => {
+  if (event.key === "Enter") {
+    test();
+  }
+});
+restoreState();
+checkCooldown();
+
+if (!solved && lockedUntil > Date.now()) {
+  timer = setInterval(updateCooldown, 250);
+}
+
+</script>
+
+</body>
+</html>
